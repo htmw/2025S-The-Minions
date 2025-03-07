@@ -41,7 +41,7 @@ All responses follow standard HTTP status codes:
 
 ### Endpoints Check
 
-#### GET /mri-scans
+#### GET /test
 Check if the backend server is running.
 
 **Response Example:**

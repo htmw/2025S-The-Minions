@@ -8,7 +8,7 @@ describe('Server API Test', () =>{
         app = express();
         app.use(express.json());
         
-        app.post('/api/mri-scans/upload', (req, res) => {
+        app.post('/api/test/upload', (req, res) => {
             if (!req.body || Object.keys(req.body).length === 0){
                 return res.status(400).json({message: 'Data Required!'});
             }
@@ -17,10 +17,10 @@ describe('Server API Test', () =>{
         });
     });
 
-    test('POST /api/mri-scans/upload should respond with a json object and received data', async() => {
+    test('POST /api/test/upload should respond with a json object and received data', async() => {
         const data = {name: 'Patient0001', age: 25};
         const response = await request(app)
-            .post('/api/mri-scans/upload')
+            .post('/api/test/upload')
             .send(data)
             .expect(200);
         expect(response.body).toEqual({
@@ -29,9 +29,9 @@ describe('Server API Test', () =>{
         });
     });
 
-    test('POST /api/mri-scans/upload should return an error if no data sent', async() =>{
+    test('POST /api/test/upload should return an error if no data sent', async() =>{
         const response = await request(app)
-            .post('/api/mri-scans/upload')
+            .post('/api/test/upload')
             .send()
             .expect(400);
         expect(response.body).toEqual({

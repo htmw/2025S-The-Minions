@@ -1,4 +1,3 @@
-// app/home/page.jsx
 import React from "react";
 import { 
   Upload,

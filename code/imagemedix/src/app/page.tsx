@@ -41,7 +41,7 @@ export default function Home() {
             
             <div className="flex items-center gap-3">
               <Link
-                href="#get-started"
+                href="/home"
                 className="hidden sm:flex text-sm text-gray-300 hover:text-white transition-colors"
               >
                 Get Started

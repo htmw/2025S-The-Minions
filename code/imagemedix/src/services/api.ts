@@ -114,7 +114,30 @@ interface AnalysisResults {
 // ML Model endpoints
 export const mlModel = {
     getAnalysisStatus: (scanId: string) => api.get<AnalysisStatus>(`/scans/${scanId}/status`),
-    getAnalysisResults: (scanId: string) => api.get<AnalysisResults>(`/scans/${scanId}`)
+    getAnalysisResults: (scanId: string) => api.get<AnalysisResults>(`/scans/${scanId}`),
+    
+    // Use Next.js API route as a proxy to Hugging Face
+    analyzeChestXray: async (imageFile: File) => {
+        try {
+            console.log('Sending chest X-ray for analysis through Next.js API route');
+            
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            
+            // Use relative URL to the Next.js API route
+            const response = await axios.post('/api/ml/analyze-chest', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            
+            console.log('Received response from proxy:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error analyzing chest X-ray:', error);
+            throw error;
+        }
+    }
 };
 
 export const user = {

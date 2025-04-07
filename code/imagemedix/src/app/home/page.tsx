@@ -1,99 +1,156 @@
-import React from "react";
-import { 
-  Upload,
-  LayoutGrid,
-  Settings,
-  History,
-  Brain
-} from "lucide-react";
-import Link from "next/link";
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { auth } from '@/services/api';
+import { Brain, Upload, History, Settings, LogOut } from 'lucide-react';
 
 export default function HomePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await auth.getCurrentUser();
+        setUser(response.data);
+      } catch (error) {
+        router.push('/auth/login');
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/auth/login');
+  };
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <nav className="flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded bg-indigo-600 flex items-center justify-center text-white">
-                <Brain size={20} />
+      {/* Sidebar */}
+      <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800">
+        <div className="flex flex-col h-full">
+          <div className="p-6">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center">
+                <Brain size={20} className="text-white" />
               </div>
               <span className="text-xl font-bold">
                 <span className="text-indigo-500">Image</span>Medix
               </span>
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-8 text-gray-400">
-              <Link href="/home" className="text-sm hover:text-white transition-colors">Home</Link>
-              <Link href="/upload" className="text-sm hover:text-white transition-colors">Upload</Link>
-              <Link href="/results" className="text-sm hover:text-white transition-colors">Results</Link>
-              <Link href="/about" className="text-sm hover:text-white transition-colors">About</Link>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="rounded-full bg-gray-800 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 transition-all"
-              >
-                Profile
-              </Link>
-            </div>
-          </nav>
-        </div>
-      </header>
+          </div>
 
-      <main className="py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h1 className="text-3xl font-bold mb-8">Welcome to ImageMedix</h1>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Quick Actions Cards */}
-            <Link href="/upload" 
-              className="bg-gray-900 p-6 rounded-xl border border-gray-800 hover:border-indigo-500/50 transition-all group hover:shadow-lg">
-              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4">
+          <nav className="flex-1 px-4 space-y-1">
+            <Link
+              href="/home"
+              className="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 rounded-lg"
+            >
+              <Brain size={20} />
+              <span>Dashboard</span>
+            </Link>
+            <Link
+              href="/upload"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <Upload size={20} />
+              <span>Upload Scans</span>
+            </Link>
+            <Link
+              href="/history"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <History size={20} />
+              <span>History</span>
+            </Link>
+            <Link
+              href="/settings"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <Settings size={20} />
+              <span>Settings</span>
+            </Link>
+          </nav>
+
+          <div className="p-4 border-t border-gray-800">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                <span className="text-sm font-medium text-white">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">{user.name}</p>
+                <p className="text-xs text-gray-400">{user.email}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="ml-64 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Welcome back, {user.name}</h1>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <LogOut size={20} />
+              <span>Logout</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Quick Upload Card */}
+            <Link
+              href="/upload"
+              className="p-6 bg-gray-900 rounded-lg border border-gray-800 hover:border-indigo-500 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-600/30 transition-colors">
                 <Upload size={24} className="text-indigo-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Upload Image</h3>
-              <p className="text-gray-400 text-sm">Upload medical images for AI analysis</p>
+              <h3 className="text-xl font-semibold mb-2">Upload New Scan</h3>
+              <p className="text-gray-400">
+                Upload medical scans for AI-powered analysis and diagnosis.
+              </p>
             </Link>
 
-            <Link href="/results" 
-              className="bg-gray-900 p-6 rounded-xl border border-gray-800 hover:border-indigo-500/50 transition-all group hover:shadow-lg">
-              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4">
-                <LayoutGrid size={24} className="text-indigo-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">View Results</h3>
-              <p className="text-gray-400 text-sm">Access your analysis results</p>
-            </Link>
-
-            <Link href="/history" 
-              className="bg-gray-900 p-6 rounded-xl border border-gray-800 hover:border-indigo-500/50 transition-all group hover:shadow-lg">
-              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4">
+            {/* Recent Scans Card */}
+            <Link
+              href="/history"
+              className="p-6 bg-gray-900 rounded-lg border border-gray-800 hover:border-indigo-500 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-600/30 transition-colors">
                 <History size={24} className="text-indigo-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">History</h3>
-              <p className="text-gray-400 text-sm">View past analyses and reports</p>
+              <h3 className="text-xl font-semibold mb-2">Recent Scans</h3>
+              <p className="text-gray-400">
+                View and manage your recently uploaded medical scans.
+              </p>
             </Link>
 
-            <Link href="/settings" 
-              className="bg-gray-900 p-6 rounded-xl border border-gray-800 hover:border-indigo-500/50 transition-all group hover:shadow-lg">
-              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4">
+            {/* Settings Card */}
+            <Link
+              href="/settings"
+              className="p-6 bg-gray-900 rounded-lg border border-gray-800 hover:border-indigo-500 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-indigo-600/20 rounded-lg flex items-center justify-center mb-4 group-hover:bg-indigo-600/30 transition-colors">
                 <Settings size={24} className="text-indigo-400" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Settings</h3>
-              <p className="text-gray-400 text-sm">Manage your account settings</p>
+              <h3 className="text-xl font-semibold mb-2">Settings</h3>
+              <p className="text-gray-400">
+                Manage your account settings and preferences.
+              </p>
             </Link>
-          </div>
-          
-          {/* Recent Activity Section */}
-          <div className="mt-12">
-            <h2 className="text-xl font-semibold mb-6">Recent Activity</h2>
-            <div className="bg-gray-900 rounded-xl border border-gray-800">
-              <div className="p-6">
-                <p className="text-gray-400">No recent activity to display</p>
-              </div>
-            </div>
           </div>
         </div>
       </main>

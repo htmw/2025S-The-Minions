@@ -1,323 +1,208 @@
-
 "use client";
 
-import React, { useState } from "react";
-import { 
-  Brain,
-  Search,
-  Filter,
-  Calendar,
-  Clock,
-  FileImage,
-  ArrowRight,
-  Download,
-  MoreVertical,
-  Upload,
-  CheckCircle,
-  AlertCircle,
-  ChevronDown
-} from "lucide-react";
-import Link from "next/link";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { scans } from '@/services/api';
+import { Brain, Upload, History, Settings, LogOut, FileText, Trash2 } from 'lucide-react';
+
+interface Scan {
+  _id: string;
+  patientId: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  result?: {
+    diagnosis: string;
+    confidence: number;
+  };
+}
 
 export default function HistoryPage() {
-  const [activities] = useState([
-    {
-      id: 1,
-      type: "upload",
-      patientId: "PT-2024-001",
-      description: "Chest X-Ray uploaded",
-      timestamp: "2024-03-10 14:30",
-      status: "completed",
-      imageType: "X-Ray"
-    },
-    {
-      id: 2,
-      type: "analysis",
-      patientId: "PT-2024-001",
-      description: "Analysis completed - Pneumonia detected",
-      timestamp: "2024-03-10 14:32",
-      status: "completed",
-      confidence: 95.8,
-      result: "Pneumonia"
-    },
-    {
-      id: 3,
-      type: "download",
-      patientId: "PT-2024-001",
-      description: "Report downloaded",
-      timestamp: "2024-03-10 14:35",
-      status: "completed"
-    },
-    {
-      id: 4,
-      type: "upload",
-      patientId: "PT-2024-002",
-      description: "Brain MRI uploaded",
-      timestamp: "2024-03-09 10:15",
-      status: "completed",
-      imageType: "MRI"
-    },
-    {
-      id: 5,
-      type: "analysis",
-      patientId: "PT-2024-002",
-      description: "Analysis completed - Normal scan",
-      timestamp: "2024-03-09 10:18",
-      status: "completed",
-      confidence: 98.2,
-      result: "Normal"
-    }
-  ]);
+  const router = useRouter();
+  const [scansList, setScansList] = useState<Scan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  useEffect(() => {
+    fetchScans();
+  }, []);
 
-  // Filter activities based on search term and filter type
-  const filteredActivities = activities.filter(activity => {
-    const matchesSearch = 
-      activity.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (filterType === "all") return matchesSearch;
-    return matchesSearch && activity.type === filterType;
-  });
-
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case "upload":
-        return <Upload size={20} className="text-indigo-400" />;
-      case "analysis":
-        return <Brain size={20} className="text-indigo-400" />;
-      case "download":
-        return <Download size={20} className="text-indigo-400" />;
-      default:
-        return <FileImage size={20} className="text-indigo-400" />;
+  const fetchScans = async () => {
+    try {
+      const response = await scans.getAll();
+      setScansList(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch scans');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "completed":
-        return (
-          <span className="inline-flex items-center gap-1 text-sm text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-            <CheckCircle size={12} />
-            Completed
-          </span>
-        );
-      case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 text-sm text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded-full">
-            <Clock size={12} />
-            Pending
-          </span>
-        );
-      case "error":
-        return (
-          <span className="inline-flex items-center gap-1 text-sm text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
-            <AlertCircle size={12} />
-            Error
-          </span>
-        );
-      default:
-        return null;
+  const handleDelete = async (scanId: string) => {
+    if (!confirm('Are you sure you want to delete this scan?')) {
+      return;
     }
+
+    try {
+      await scans.delete(scanId);
+      setScansList(prev => prev.filter(scan => scan._id !== scanId));
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete scan');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <nav className="flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded bg-indigo-600 flex items-center justify-center text-white">
-                <Brain size={20} />
+      {/* Sidebar */}
+      <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800">
+        <div className="flex flex-col h-full">
+          <div className="p-6">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center">
+                <Brain size={20} className="text-white" />
               </div>
               <span className="text-xl font-bold">
                 <span className="text-indigo-500">Image</span>Medix
               </span>
+            </div>
+          </div>
+
+          <nav className="flex-1 px-4 space-y-1">
+            <Link
+              href="/home"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <Brain size={20} />
+              <span>Dashboard</span>
             </Link>
-            
-            <div className="hidden md:flex items-center gap-8 text-gray-400">
-              <Link href="/home" className="text-sm hover:text-white transition-colors">Home</Link>
-              <Link href="/upload" className="text-sm hover:text-white transition-colors">Upload</Link>
-              <Link href="/results" className="text-sm hover:text-white transition-colors">Results</Link>
-              <Link href="/about" className="text-sm hover:text-white transition-colors">About</Link>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="rounded-full bg-gray-800 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 transition-all"
-              >
-                Profile
-              </Link>
-            </div>
+            <Link
+              href="/upload"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <Upload size={20} />
+              <span>Upload Scans</span>
+            </Link>
+            <Link
+              href="/history"
+              className="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 rounded-lg"
+            >
+              <History size={20} />
+              <span>History</span>
+            </Link>
+            <Link
+              href="/settings"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <Settings size={20} />
+              <span>Settings</span>
+            </Link>
           </nav>
         </div>
-      </header>
+      </aside>
 
-      <main className="py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          {/* Page Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Activity History</h1>
-              <p className="text-gray-400">Track and manage your medical image analysis history</p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input 
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by ID or description..."
-                  className="bg-gray-900 rounded-full pl-10 pr-4 py-2 text-sm border border-gray-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full sm:w-64"
-                />
-              </div>
-              
-              <div className="relative">
-                <button 
-                  onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-                  className="flex items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-sm border border-gray-800 hover:bg-gray-800 transition-colors"
-                >
-                  <Filter size={16} />
-                  {filterType === "all" ? "All Activities" : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-                  <ChevronDown size={14} />
-                </button>
-
-                {isFilterMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg shadow-lg border border-gray-800 py-1 z-10">
-                    <button
-                      onClick={() => {
-                        setFilterType("all");
-                        setIsFilterMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
-                    >
-                      All Activities
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFilterType("upload");
-                        setIsFilterMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
-                    >
-                      Uploads
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFilterType("analysis");
-                        setIsFilterMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
-                    >
-                      Analysis
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFilterType("download");
-                        setIsFilterMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
-                    >
-                      Downloads
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Main Content */}
+      <main className="ml-64 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Scan History</h1>
+            <Link
+              href="/upload"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+            >
+              <Upload size={20} />
+              <span>Upload New Scan</span>
+            </Link>
           </div>
 
-          {/* Activity Timeline */}
-          <div className="space-y-4">
-            {filteredActivities.map((activity) => (
-              <div 
-                key={activity.id}
-                className="bg-gray-900 rounded-xl border border-gray-800 p-6 hover:border-indigo-500/50 transition-all"
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : scansList.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText size={32} className="text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No scans found</h3>
+              <p className="text-gray-400 mb-6">Upload your first medical scan to get started</p>
+              <Link
+                href="/upload"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded bg-indigo-600/20 flex items-center justify-center flex-shrink-0">
-                      {getActivityIcon(activity.type)}
-                    </div>
-                    
+                <Upload size={20} />
+                <span>Upload Scan</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {scansList.map((scan) => (
+                <div
+                  key={scan._id}
+                  className="bg-gray-900 rounded-lg border border-gray-800 p-6"
+                >
+                  <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-medium">{activity.description}</h3>
-                        {getStatusBadge(activity.status)}
+                      <h3 className="text-lg font-semibold mb-1">
+                        Patient ID: {scan.patientId}
+                      </h3>
+                      <p className="text-sm text-gray-400 mb-4">
+                        Uploaded on {formatDate(scan.createdAt)}
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-gray-400">
+                          Type: {scan.type}
+                        </span>
+                        <span className="text-sm text-gray-400">
+                          Status: {scan.status}
+                        </span>
                       </div>
-                      
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} />
-                          <span>{activity.timestamp}</span>
+                      {scan.result && (
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-400">
+                            Diagnosis: {scan.result.diagnosis}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            Confidence: {(scan.result.confidence * 100).toFixed(1)}%
+                          </p>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span>Patient ID:</span>
-                          <span className="text-white">{activity.patientId}</span>
-                        </div>
-                        {activity.imageType && (
-                          <div className="flex items-center gap-1.5">
-                            <span>Type:</span>
-                            <span className="text-white">{activity.imageType}</span>
-                          </div>
-                        )}
-                        {activity.confidence && (
-                          <div className="flex items-center gap-1.5">
-                            <span>Confidence:</span>
-                            <span className="text-white">{activity.confidence}%</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/results/${scan._id}`}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        <FileText size={20} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(scan._id)}
+                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={20} />
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {activity.type === "analysis" && (
-                      <Link
-                        href={`/results/${activity.patientId}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-                      >
-                        View Results
-                        <ArrowRight size={14} />
-                      </Link>
-                    )}
-                    {(activity.type === "upload" || activity.type === "analysis") && (
-                      <button 
-                        className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors"
-                        title="Download report"
-                      >
-                        <Download size={14} className="text-gray-400" />
-                      </button>
-                    )}
-                    <button 
-                      className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors"
-                      title="More options"
-                    >
-                      <MoreVertical size={14} className="text-gray-400" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
-
-            {filteredActivities.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto rounded-full bg-gray-800 flex items-center justify-center mb-4">
-                  <Search size={24} className="text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">No activities found</h3>
-                <p className="text-gray-400">
-                  Try adjusting your search or filter settings
-                </p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

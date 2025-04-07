@@ -1,4 +1,6 @@
-import React from "react";
+'use client';
+
+import React, { useEffect, useState } from "react";
 import { 
   Zap, 
   Shield, 
@@ -15,8 +17,37 @@ import {
   ArrowRight
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { auth } from "@/services/api";
 
 export default function Home() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const response = await auth.getCurrentUser();
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      setIsAuthenticated(false);
+    }
+  };
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      router.push('/upload');
+    } else {
+      router.push('/auth/login');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans antialiased">
       {/* Header */}
@@ -47,7 +78,7 @@ export default function Home() {
                 Get Started
               </Link>
               <Link
-                href="#sign-in"
+                href="/auth/login"
                 className="rounded-full bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-500 transition-all hover:shadow-lg hover:shadow-indigo-500/20 flex items-center gap-1.5"
               >
                 Sign In <ArrowRight size={14} />
@@ -280,13 +311,13 @@ export default function Home() {
                 <p className="text-gray-400 max-w-2xl mb-8">
                   Experience the power of our AI diagnostic system in your healthcare facility. Start using ImageMedix today and see how quickly and accurately our system can identify pneumonia and brain tumors.
                 </p>
-                <Link
-                  href="#get-started"
+                <button
+                  onClick={handleGetStarted}
                   className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-full font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20 flex items-center gap-2"
                 >
                   <Zap size={18} />
                   Get Started Now
-                </Link>
+                </button>
               </div>
             </div>
           </div>

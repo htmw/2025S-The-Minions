@@ -138,6 +138,14 @@ export default function UploadPage() {
       try {
         const uploadResponse = await scans.upload(formData);
         console.log('Scan uploaded to backend:', uploadResponse.data);
+        
+        // Redirect to results page with the new scan ID
+        if (uploadResponse.data._id) {
+          router.push(`/results/${uploadResponse.data._id}`);
+        } else {
+          // If no ID was returned, redirect to main results page
+          router.push('/results');
+        }
       } catch (uploadError) {
         console.error('Failed to upload scan to backend:', uploadError);
         // Continue with UI display even if backend upload fails
@@ -161,7 +169,7 @@ export default function UploadPage() {
         setAnalysisResults(prev => ({ ...prev, [fileId]: results }));
         setUploadStatus(prev => ({ ...prev, [fileId]: 'success' }));
         
-        // Navigate to results page if analysis was successful
+        // Redirect to results page when analysis is complete
         router.push(`/results/${scanId}`);
       } else if (statusData.status === 'failed' || (statusData.jobStatus?.state === 'failed')) {
         setUploadStatus(prev => ({ ...prev, [fileId]: 'error' }));
@@ -202,7 +210,7 @@ export default function UploadPage() {
           if (scanType === 'chest') {
             // Process chest X-ray using Gemini API via Next.js API route
             await processChestXray(file);
-            // Results are displayed directly on the upload page
+            // The redirect will happen in the processChestXray function
           } else {
             // Regular flow for brain scans using backend processing
             const formData = new FormData();
@@ -217,6 +225,7 @@ export default function UploadPage() {
             // Start checking analysis status
             if (response.data._id) {
               checkAnalysisStatus(response.data._id, file.id);
+              // The redirect will happen in the checkAnalysisStatus function
             }
           }
         } catch (err: any) {

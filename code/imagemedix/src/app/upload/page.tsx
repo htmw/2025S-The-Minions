@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, Fragment } from "react";
 import { 
   Upload,
   Brain,
@@ -15,7 +15,12 @@ import {
   Eye,
   Badge,
   BarChart3,
-  FileText
+  FileText,
+  Calendar,
+  User,
+  Clock,
+  Download,
+  XCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useDropzone } from "react-dropzone";
@@ -44,8 +49,11 @@ export default function UploadPage() {
   const [scanType, setScanType] = useState<'brain' | 'chest'>('brain');
   const [expandedExplanations, setExpandedExplanations] = useState<{ [key: string]: boolean }>({});
   const [processingComplete, setProcessingComplete] = useState(false);
-  const [uploadedScanIds, setUploadedScanIds] = useState<string[]>([]); // Store IDs of uploaded scans
+  const [uploadedScanIds, setUploadedScanIds] = useState<string[]>([]); 
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<FileWithId | null>(null);
 
   useEffect(() => {
     // Show success message when processing is complete
@@ -125,6 +133,18 @@ export default function UploadPage() {
       
       const condition = pneumoniaScore > normalScore ? 'pneumonia' : 'normal';
       const confidence = condition === 'pneumonia' ? pneumoniaScore : normalScore;
+
+      // Generate a structured report
+      const reportDate = new Date().toISOString();
+      const structuredReport = generateReport({
+        patientName,
+        patientId,
+        scanType: 'chest',
+        condition,
+        confidence,
+        explanation,
+        reportDate
+      });
       
       // Save results
       const result = {
@@ -133,6 +153,8 @@ export default function UploadPage() {
         normalScore,
         pneumoniaScore,
         explanation,
+        report: structuredReport,
+        reportDate,
         raw: response
       };
       
@@ -157,7 +179,8 @@ export default function UploadPage() {
         tumorType: condition === 'pneumonia' ? 'Pneumonia' : 'Normal',
         tumorLocation: condition === 'pneumonia' ? 'Lungs' : 'N/A',
         tumorSize: 'N/A',
-        additionalNotes: explanation.slice(0, 1000) // Limit length for database storage
+        additionalNotes: explanation.slice(0, 1000), // Limit length for database storage
+        report: structuredReport
       }));
       
       try {
@@ -191,7 +214,31 @@ export default function UploadPage() {
       
       if (statusData.status === 'completed') {
         const { data: results } = await scans.getById(scanId);
-        setAnalysisResults(prev => ({ ...prev, [fileId]: results }));
+
+        // Generate a structured report if not already present
+        const reportDate = new Date().toISOString();
+        let structuredReport = results.report;
+        
+        if (!structuredReport) {
+          structuredReport = generateReport({
+            patientName,
+            patientId,
+            scanType: 'brain',
+            condition: results.hasTumor ? 'tumor' : 'normal',
+            confidence: results.confidence,
+            explanation: results.additionalNotes || '',
+            reportDate
+          });
+        }
+
+        // Add the report to the results
+        const enhancedResults = {
+          ...results,
+          report: structuredReport,
+          reportDate
+        };
+        
+        setAnalysisResults(prev => ({ ...prev, [fileId]: enhancedResults }));
         setUploadStatus(prev => ({ ...prev, [fileId]: 'success' }));
         
         // Store the scan ID if not already stored
@@ -205,17 +252,118 @@ export default function UploadPage() {
         setUploadStatus(prev => ({ ...prev, [fileId]: 'error' }));
         setError(`Analysis failed for ${fileId}: ${statusData.jobStatus?.failedReason || 'Unknown error'}`);
       } else if (statusData.status === 'processing' || statusData.jobStatus?.state === 'active') {
-        setUploadStatus(prev => ({ ...prev, [fileId]: 'analyzing' }));
+        setUploadStatus(prev => ({ ...prev, [file.id]: 'analyzing' }));
         // Still processing, check again in 5 seconds
         setTimeout(() => checkAnalysisStatus(scanId, fileId), 5000);
       } else {
         // Waiting in queue
-        setUploadStatus(prev => ({ ...prev, [fileId]: 'analyzing' }));
+        setUploadStatus(prev => ({ ...prev, [file.id]: 'analyzing' }));
         setTimeout(() => checkAnalysisStatus(scanId, fileId), 5000);
       }
     } catch (error: any) {
       setUploadStatus(prev => ({ ...prev, [fileId]: 'error' }));
       setError(error.response?.data?.message || `Failed to get analysis status for ${fileId}`);
+    }
+  };
+
+  // Generate a structured medical report
+  const generateReport = ({ 
+    patientName, 
+    patientId, 
+    scanType, 
+    condition, 
+    confidence, 
+    explanation,
+    reportDate
+  }: { 
+    patientName: string;
+    patientId: string;
+    scanType: string;
+    condition: string;
+    confidence: number;
+    explanation: string;
+    reportDate: string;
+  }) => {
+    // Format date for display
+    const date = new Date(reportDate);
+    const formattedDate = date.toLocaleDateString('en-US', {
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric'
+    });
+    const formattedTime = date.toLocaleTimeString('en-US', {
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+
+    // Create different reports based on scan type
+    if (scanType === 'chest') {
+      // For chest X-rays
+      return `
+# RADIOLOGICAL REPORT
+
+## PATIENT INFORMATION
+- **Patient Name:** ${patientName}
+- **Patient ID:** ${patientId}
+- **Exam Date:** ${formattedDate} at ${formattedTime}
+- **Exam Type:** Chest X-Ray
+- **Referring Physician:** N/A
+
+## CLINICAL INDICATION
+Routine chest X-ray examination for pneumonia screening.
+
+## FINDINGS
+${explanation || `
+Analysis of the chest X-ray shows ${condition === 'pneumonia' ? 'evidence of pneumonia' : 'no signs of pneumonia'}. ${condition === 'pneumonia' ? 'There are opacities consistent with pneumonic infiltrates.' : 'Lung fields appear clear.'} Heart size and pulmonary vascularity are within normal limits. No pleural effusion or pneumothorax is identified.`}
+
+## IMPRESSION
+${condition === 'pneumonia' 
+  ? `POSITIVE FOR PNEUMONIA with ${(confidence * 100).toFixed(1)}% confidence.`
+  : `NEGATIVE FOR PNEUMONIA with ${(confidence * 100).toFixed(1)}% confidence.`}
+
+## RECOMMENDATIONS
+${condition === 'pneumonia' 
+  ? 'Clinical correlation and appropriate treatment for pneumonia is recommended. Follow-up imaging may be necessary to monitor response to treatment.'
+  : 'No further imaging follow-up is required at this time based on these findings alone.'}
+
+Generated by ImageMedix AI Diagnostic System
+This report should be reviewed by a licensed healthcare professional.
+      `;
+    } else {
+      // For brain MRIs
+      return `
+# RADIOLOGICAL REPORT
+
+## PATIENT INFORMATION
+- **Patient Name:** ${patientName}
+- **Patient ID:** ${patientId}
+- **Exam Date:** ${formattedDate} at ${formattedTime}
+- **Exam Type:** Brain MRI
+- **Referring Physician:** N/A
+
+## CLINICAL INDICATION
+Brain MRI for evaluation of potential tumor.
+
+## TECHNIQUE
+Standard multiplanar MRI sequences of the brain were performed.
+
+## FINDINGS
+${explanation || `
+Analysis of the brain MRI ${condition === 'tumor' ? 'reveals evidence of an intracranial mass' : 'shows no evidence of intracranial mass'}. ${condition === 'tumor' ? 'The lesion demonstrates characteristics consistent with a brain tumor.' : 'The brain parenchyma demonstrates normal signal intensity throughout.'} Ventricles and sulci are of normal size and configuration. No midline shift or mass effect is seen. No evidence of acute infarction, hemorrhage, or extra-axial collection.`}
+
+## IMPRESSION
+${condition === 'tumor' 
+  ? `POSITIVE FOR BRAIN TUMOR with ${(confidence * 100).toFixed(1)}% confidence.`
+  : `NEGATIVE FOR BRAIN TUMOR with ${(confidence * 100).toFixed(1)}% confidence.`}
+
+## RECOMMENDATIONS
+${condition === 'tumor' 
+  ? 'Neurosurgical consultation is recommended. Consider additional imaging with contrast for further characterization. Clinical correlation is advised.'
+  : 'No further imaging follow-up is required at this time based on these findings alone.'}
+
+Generated by ImageMedix AI Diagnostic System
+This report should be reviewed by a licensed healthcare professional.
+      `;
     }
   };
 
@@ -278,6 +426,40 @@ export default function UploadPage() {
         }
       }
     }
+  };
+
+  // Open the result modal
+  const openResultModal = (fileId: string) => {
+    const file = files.find(f => f.id === fileId) || null;
+    const result = analysisResults[fileId] || null;
+    
+    if (file && result) {
+      setSelectedFile(file);
+      setSelectedResult(result);
+      setShowResultModal(true);
+    }
+  };
+
+  // Close the result modal
+  const closeResultModal = () => {
+    setShowResultModal(false);
+    setSelectedFile(null);
+    setSelectedResult(null);
+  };
+
+  // Download report as text file
+  const downloadReport = () => {
+    if (!selectedResult || !selectedResult.report || !selectedFile) return;
+    
+    const blob = new Blob([selectedResult.report], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedFile.name.split('.')[0]}-report.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Manual redirect to results page
@@ -462,8 +644,8 @@ export default function UploadPage() {
               {files.map((file) => {
                 const result = analysisResults[file.id];
                 const isChestXray = scanType === 'chest';
-                const condition = isChestXray && result ? result.condition : null;
-                const isAbnormal = isChestXray ? condition === 'pneumonia' : false;
+                const condition = isChestXray && result ? result.condition : result?.hasTumor ? 'tumor' : 'normal';
+                const isAbnormal = isChestXray ? condition === 'pneumonia' : condition === 'tumor';
                 
                 return (
                   <div
@@ -524,18 +706,6 @@ export default function UploadPage() {
                             >
                               <X className="h-4 w-4" />
                             </button>
-                          ) : uploadStatus[file.id] === 'success' && result?.explanation ? (
-                            <button
-                              onClick={() => toggleExplanation(file.id)}
-                              className="p-1 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white"
-                              title={expandedExplanations[file.id] ? "Hide details" : "Show details"}
-                            >
-                              {expandedExplanations[file.id] ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
-                            </button>
                           ) : null}
                         </div>
                       </div>
@@ -554,12 +724,11 @@ export default function UploadPage() {
                                 ? condition === 'pneumonia'
                                   ? 'Pneumonia Detected'
                                   : 'Normal'
-                                : result.hasTumor
+                                : condition === 'tumor'
                                   ? 'Tumor Detected'
                                   : 'Normal'}
                             </p>
                           </div>
-                          
                           {result.confidence && (
                             <div className="bg-gray-700/50 px-3 py-1.5 rounded-lg border border-gray-700">
                               <p className="text-sm text-gray-300 flex items-center">
@@ -568,22 +737,18 @@ export default function UploadPage() {
                               </p>
                             </div>
                           )}
+                          
+                          {/* View Report Button */}
+                          <button 
+                            onClick={() => openResultModal(file.id)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 px-3 rounded-lg text-sm font-medium flex items-center"
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1.5" />
+                            View Report
+                          </button>
                         </div>
                       )}
                     </div>
-                    
-                    {/* Expanded AI Explanation */}
-                    {result?.explanation && expandedExplanations[file.id] && (
-                      <div className="px-4 pb-4 pt-2 border-t border-gray-700 bg-gray-800/50">
-                        <div className="flex items-center gap-2 mb-3">
-                          <FileText className="h-4 w-4 text-gray-400" />
-                          <h4 className="text-sm font-medium text-gray-300">AI Analysis</h4>
-                        </div>
-                        <div className="bg-gray-900 rounded-lg p-3 text-xs text-gray-300 whitespace-pre-line">
-                          {result.explanation}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -614,6 +779,162 @@ export default function UploadPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal for Detailed Result Display */}
+      {showResultModal && selectedResult && selectedFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <div className="bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-800 p-4">
+              <h3 className="text-lg font-medium text-white flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-indigo-400" />
+                Diagnostic Report
+              </h3>
+              <button
+                onClick={closeResultModal}
+                className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-800"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-1 overflow-auto p-4">
+              <div className="flex flex-col space-y-6">
+                {/* Top Section - Patient Info and Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Patient Info Card */}
+                  <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h4 className="font-medium text-indigo-300 mb-3 flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      Patient Information
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Name:</span>
+                        <span className="text-white font-medium">{patientName}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">ID:</span>
+                        <span className="text-white">{patientId}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Scan Type:</span>
+                        <span className="text-white capitalize">{scanType} Scan</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">File:</span>
+                        <span className="text-white">{selectedFile.name}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Result Summary Card */}
+                  <div className={`p-4 rounded-lg border ${
+                    (selectedResult.condition === 'pneumonia' || selectedResult.hasTumor) 
+                      ? 'bg-red-900/20 border-red-700' 
+                      : 'bg-green-900/20 border-green-700'
+                  }`}>
+                    <h4 className={`font-medium mb-3 flex items-center ${
+                      (selectedResult.condition === 'pneumonia' || selectedResult.hasTumor) 
+                        ? 'text-red-300' 
+                        : 'text-green-300'
+                    }`}>
+                      <Badge className="h-4 w-4 mr-2" />
+                      Diagnostic Summary
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Finding:</span>
+                        <span className={`font-bold ${
+                          (selectedResult.condition === 'pneumonia' || selectedResult.hasTumor) 
+                            ? 'text-red-400' 
+                            : 'text-green-400'
+                        }`}>
+                          {scanType === 'chest' 
+                            ? selectedResult.condition === 'pneumonia' ? 'Pneumonia' : 'Normal' 
+                            : selectedResult.hasTumor ? 'Brain Tumor' : 'Normal'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-300">Confidence:</span>
+                        <div className="flex items-center">
+                          <div className="w-24 bg-gray-700 rounded-full h-2 mr-2">
+                            <div className={`h-2 rounded-full ${
+                              (selectedResult.condition === 'pneumonia' || selectedResult.hasTumor) 
+                                ? 'bg-red-500' 
+                                : 'bg-green-500'
+                            }`} style={{ width: `${(selectedResult.confidence || 0.5) * 100}%` }}></div>
+                          </div>
+                          <span className="text-white font-medium">{getConfidencePercentage(selectedResult)}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Date:</span>
+                        <span className="text-white">
+                          {selectedResult.reportDate 
+                            ? new Date(selectedResult.reportDate).toLocaleString()
+                            : new Date().toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Detailed Report */}
+                <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-medium text-indigo-300 flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Detailed Report
+                    </h4>
+                    <button 
+                      onClick={downloadReport}
+                      className="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded text-white"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </button>
+                  </div>
+                  <div className="bg-gray-900 rounded p-4 text-gray-300 whitespace-pre-line font-mono text-xs overflow-auto max-h-80">
+                    {selectedResult.report || 'No detailed report available.'}
+                  </div>
+                </div>
+                
+                {/* AI Analysis */}
+                {selectedResult.explanation && (
+                  <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+                    <h4 className="font-medium text-indigo-300 flex items-center mb-4">
+                      <Brain className="h-4 w-4 mr-2" />
+                      AI Analysis
+                    </h4>
+                    <div className="bg-gray-900 rounded p-4 text-gray-300 whitespace-pre-line text-sm">
+                      {selectedResult.explanation}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="border-t border-gray-800 p-4 flex justify-end gap-3">
+              <button
+                onClick={downloadReport}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download Report
+              </button>
+              <button
+                onClick={closeResultModal}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

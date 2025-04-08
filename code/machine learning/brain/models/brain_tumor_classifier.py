@@ -9,72 +9,41 @@ class BrainTumorClassifier:
         self._load_weights()
 
     def _load_weights(self):
-        """Check if weights file exists"""
         self.weights_path = os.path.join(os.path.dirname(__file__), 'weights', 'brain_tumor_model.h5')
         self.has_weights = os.path.exists(self.weights_path)
 
     def predict(self, image):
-        """Simulate predictions on an image"""
         start_time = datetime.now()
-
-        # Simulate processing delay
         processing_time = random.uniform(0.5, 2.0)
-
-        # Simulate class probabilities
-        # In a real model, this would be the output of the neural network
-        if random.random() < 0.7:  # 70% chance of tumor
-            # Generate random probabilities that sum to 1
+        if random.random() < 0.7:
             probs = [random.random() for _ in range(4)]
-            # Make sure the tumor classes have higher probabilities
-            probs[3] = probs[3] * 0.3  # Reduce probability of 'normal' class
-            # Normalize to sum to 1
+            probs[3] = probs[3] * 0.3
             total = sum(probs)
-            probs = [p/total for p in probs]
-
-            # Find the highest probability tumor type (excluding 'normal')
+            probs = [p / total for p in probs]
             tumor_idx = probs.index(max(probs[:3]))
             tumor_type = self.class_names[tumor_idx]
             tumor_probability = probs[tumor_idx]
-
-            # Determine tumor grade (for gliomas)
             tumor_grade = None
             if tumor_type == 'glioma':
                 tumor_grade = 'III' if tumor_probability > 0.7 else 'II'
         else:
-            # No tumor case - normal has highest probability
             probs = [random.random() * 0.2 for _ in range(3)] + [random.random() * 0.8]
             total = sum(probs)
-            probs = [p/total for p in probs]
+            probs = [p / total for p in probs]
             tumor_type = 'normal'
             tumor_probability = probs[3]
             tumor_grade = None
-
-        # Create class probabilities dictionary
-        class_probabilities = {
-            name: float(prob) for name, prob in zip(self.class_names, probs)
-        }
-
-        # Simulate tumor dimensions and volume
+        class_probabilities = {name: float(prob) for name, prob in zip(self.class_names, probs)}
         if tumor_type != 'normal':
             width = random.uniform(1.0, 4.0)
             height = random.uniform(1.0, 4.0)
             depth = random.uniform(1.0, 3.0)
         else:
             width = height = depth = 0.0
-
-        tumor_dimensions = {
-            'width': width,  # cm
-            'height': height,  # cm
-            'depth': depth   # cm
-        }
+        tumor_dimensions = {'width': width, 'height': height, 'depth': depth}
         tumor_volume = tumor_dimensions['width'] * tumor_dimensions['height'] * tumor_dimensions['depth']
-
-        # Calculate image quality score
         image_quality_score = random.uniform(0.85, 0.98)
-
-        # Calculate actual processing time
         actual_processing_time = (datetime.now() - start_time).total_seconds()
-
         return {
             'tumor_type': tumor_type,
             'tumor_grade': tumor_grade,
@@ -87,7 +56,6 @@ class BrainTumorClassifier:
         }
 
     def get_research_metrics(self):
-        """Get model performance metrics for research purposes"""
         return {
             'accuracy': 0.95,
             'precision': 0.94,
@@ -102,7 +70,6 @@ class BrainTumorClassifier:
         }
 
     def get_model_info(self):
-        """Get information about the model"""
         return {
             'version': self.version,
             'architecture': 'CNN (Simulated)',

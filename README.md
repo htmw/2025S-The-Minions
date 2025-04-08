@@ -31,7 +31,7 @@ A web application for brain tumor detection and analysis using machine learning.
 
 3. Set up environment variables:
    - Copy `.env.example` to `.env`
-   - Fill in the required values (ask a team member for the actual values)
+   - Fill in the required values (Credentials file is inn our WhatsApp Group)
 
 4. Start the server:
    ```
@@ -52,7 +52,7 @@ A web application for brain tumor detection and analysis using machine learning.
 
 3. Set up environment variables:
    - Copy `.env.local.example` to `.env.local`
-   - Fill in the required values (ask a team member for the actual values)
+   - Fill in the required values (Credentials file is in our WhatsApp Group)
 
 4. Start the development server:
    ```
@@ -63,7 +63,7 @@ A web application for brain tumor detection and analysis using machine learning.
 
 1. Navigate to the ML model directory:
    ```
-   cd code/machine\ learning/brain
+   cd code/"machine learning"/brain
    ```
 
 2. Create a virtual environment:
@@ -87,16 +87,16 @@ A web application for brain tumor detection and analysis using machine learning.
 
 ## Environment Variables
 
-For security reasons, we don't commit `.env` files to the repository. Instead, we provide example files (`.env.example` and `.env.local.example`) with the required variables but without actual values.
+For security reasons, we don't commit `.env` files to the repository. Instead, we provide example files as templates (`.env.example` and `.env.local.example`) with the required variables but without actual values.
 
-To get the actual values for these variables, please contact a team member.
+To get the actual values for these variables, please check our WhatsApp group.
 
 ## Features
 
 - User authentication (email/password and Google OAuth)
 - Brain MRI scan upload and analysis
-- Tumor detection and classification
-- Report generation
+- Tumor detection and classification(Not Completed)
+- Report generation(Using mock data)
 - User dashboard
 
 ## Contributing

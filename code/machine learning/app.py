@@ -62,5 +62,30 @@ app = Flask(__name__)
 def index():
     return "<h1>Medical Image Classification Deployment</h1><p>Use the /predict endpoint.</p>"
 
+@app.route("/predict", methods=["POST"])
+def predict():
+    model_type = request.args.get("model_type")
+    if model_type not in loaded_models:
+        return jsonify({"error": "Invalid or missing model_type. Provide one of: chest, brain, scan_type"}), 400
+    if "image" not in request.files:
+        return jsonify({"error": "No image file provided. Use key 'image'."}), 400
+    image_file = request.files["image"]
+    try:
+        image_bytes = image_file.read()
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception as e:
+        return jsonify({"error": f"Could not read image file: {e}"}), 400
+    transform = loaded_models[model_type]["transform"]
+    input_tensor = transform(image).unsqueeze(0).to(device)
+    model = loaded_models[model_type]["model"]
+    with torch.no_grad():
+        outputs = model(input_tensor)
+        _, pred_idx = torch.max(outputs, 1)
+        pred_idx = pred_idx.item()
+    idx_to_class = loaded_models[model_type]["idx_to_class"]
+    pred_class = idx_to_class.get(pred_idx, "Unknown")
+    response = {"model_type": model_type, "predicted_class": pred_class, "prediction_index": pred_idx}
+    return jsonify(response)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -31,9 +31,33 @@ export default function HistoryPage() {
   const fetchScans = async () => {
     try {
       const response = await scans.getAll();
-      setScansList(response.data);
+      
+      // Debug: Log the API response to see its structure
+      console.log('API response:', response);
+
+      // Make sure we're setting an array to scansList
+      if (response && response.data) {
+        // Handle different API response formats
+        if (Array.isArray(response.data)) {
+          setScansList(response.data);
+        } else if (response.data.scans && Array.isArray(response.data.scans)) {
+          setScansList(response.data.scans);
+        } else if (response.data.items && Array.isArray(response.data.items)) {
+          setScansList(response.data.items);
+        } else if (response.data.results && Array.isArray(response.data.results)) {
+          setScansList(response.data.results);
+        } else {
+          // If we can't find an array in the response, set an empty array
+          console.error('Unexpected API response format:', response.data);
+          setScansList([]);
+        }
+      } else {
+        setScansList([]);
+      }
     } catch (err: any) {
+      console.error('Error fetching scans:', err);
       setError(err.response?.data?.message || 'Failed to fetch scans');
+      setScansList([]); // Ensure scansList is an array even on error
     } finally {
       setLoading(false);
     }
@@ -152,7 +176,7 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="grid gap-6">
-              {scansList.map((scan) => (
+              {Array.isArray(scansList) && scansList.map((scan) => (
                 <div
                   key={scan._id}
                   className="bg-gray-900 rounded-lg border border-gray-800 p-6"

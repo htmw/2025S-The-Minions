@@ -1,31 +1,32 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 
 export default function AuthSuccess() {
     const router = useRouter();
-    const searchParams = useSearchParams();
+    const { isSignedIn, isLoaded } = useAuth();
 
     useEffect(() => {
-        const token = searchParams.get('token');
-        if (token) {
-            // Store the token
-            localStorage.setItem('token', token);
-            // Redirect to home page
-            router.push('/home');
-        } else {
-            // If no token, redirect to login
-            router.push('/auth/login');
+        if (isLoaded) {
+            if (isSignedIn) {
+                // User is authenticated, redirect to home
+                router.push('/home');
+            } else {
+                // User is not authenticated, redirect to login
+                router.push('/auth/login');
+            }
         }
-    }, [router, searchParams]);
+    }, [isSignedIn, isLoaded, router]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+            <div className="text-center text-white">
                 <h1 className="text-2xl font-bold mb-4">Processing login...</h1>
-                <p className="text-gray-600">Please wait while we complete your login.</p>
+                <p className="text-gray-400">Please wait while we complete your login.</p>
+                <div className="mt-6 w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
             </div>
         </div>
     );
-} 
+}

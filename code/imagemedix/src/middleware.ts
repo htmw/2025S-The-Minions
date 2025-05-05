@@ -1,20 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-const isPublic = createRouteMatcher([
-  "/",
-  "/auth/login(.*)",  
-  "/auth/register(.*)",  
-  "/auth/success",
-  "/api/ml/analyze-chest"
-]);
-
-export default clerkMiddleware({
-  beforeAuth: (req) => {
-    if (isPublic(req)) {
-      return;
-    }
-  }
-});
+export default clerkMiddleware();
 
 export const config = {
   matcher: [

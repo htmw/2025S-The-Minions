@@ -17,22 +17,21 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-        <SignIn 
-  appearance={{
-    elements: {
-      formButtonPrimary: 'bg-indigo-600 hover:bg-indigo-500 text-white',
-      card: 'bg-transparent shadow-none',
-      headerTitle: 'hidden',
-      headerSubtitle: 'hidden',
-      socialButtonsBlockButton: 'bg-gray-800 border border-gray-700 text-white hover:bg-gray-700',
-      formFieldInput: 'bg-gray-800 border-gray-700 text-white',
-      formFieldLabel: 'text-gray-300',
-      footer: 'hidden'
-    }
-  }}
-  redirectUrl="/home"
-  afterSignInUrl="/home"
-/>
+          <SignIn 
+            appearance={{
+              elements: {
+                formButtonPrimary: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+                card: 'bg-transparent shadow-none',
+                headerTitle: 'hidden',
+                headerSubtitle: 'hidden',
+                socialButtonsBlockButton: 'bg-gray-800 border border-gray-700 text-white hover:bg-gray-700',
+                formFieldInput: 'bg-gray-800 border-gray-700 text-white',
+                formFieldLabel: 'text-gray-300',
+                footer: 'hidden'
+              }
+            }}
+            redirectUrl="/home"
+          />
         </div>
 
         <p className="mt-8 text-center text-sm text-gray-400">

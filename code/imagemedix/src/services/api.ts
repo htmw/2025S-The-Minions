@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
@@ -9,14 +9,8 @@ const api: AxiosInstance = axios.create({
     }
 });
 
-// Add request interceptor
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${token}`;
-        }
         return config;
     },
     (error: any) => {
@@ -24,37 +18,19 @@ api.interceptors.request.use(
     }
 );
 
-// Add response interceptor
 api.interceptors.response.use(
     (response: AxiosResponse) => {
         return response;
     },
     (error: any) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            window.location.href = '/auth/login';
-        }
         return Promise.reject(error);
     }
 );
 
-// Auth endpoints
 export const auth = {
-    login: (credentials: { email: string; password: string }) =>
-        api.post('/auth/login', credentials),
-    register: (userData: { email: string; password: string; name: string; role: string }) =>
-        api.post('/auth/register', userData),
-    googleLogin: () => {
-        window.location.href = 'http://localhost:8080/api/auth/google';
-    },
-    forgotPassword: (email: string) =>
-        api.post('/auth/forgot-password', { email }),
-    resetPassword: (token: string, password: string) =>
-        api.post('/auth/reset-password', { token, password }),
     getCurrentUser: () => api.get('/auth/me')
 };
 
-// Scan endpoints
 export const scans = {
     upload: async (formData: FormData) => {
         return api.post('/scans', formData, {
@@ -111,30 +87,23 @@ interface AnalysisResults {
     };
 }
 
-// ML Model endpoints
 export const mlModel = {
     getAnalysisStatus: (scanId: string) => api.get<AnalysisStatus>(`/scans/${scanId}/status`),
     getAnalysisResults: (scanId: string) => api.get<AnalysisResults>(`/scans/${scanId}`),
     
-    // Use Next.js API route as a proxy to Hugging Face
     analyzeChestXray: async (imageFile: File) => {
         try {
-            console.log('Sending chest X-ray for analysis through Next.js API route');
-            
             const formData = new FormData();
             formData.append('image', imageFile);
             
-            // Use relative URL to the Next.js API route
             const response = await axios.post('/api/ml/analyze-chest', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
             });
             
-            console.log('Received response from proxy:', response.data);
             return response.data;
         } catch (error) {
-            console.error('Error analyzing chest X-ray:', error);
             throw error;
         }
     }

@@ -3,8 +3,21 @@
 import { SignIn } from '@clerk/nextjs';
 import Link from 'next/link';
 import { Brain } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
+import { useEffect } from 'react';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { isSignedIn, isLoaded } = useUser();
+
+  useEffect(() => {
+    // If user is already signed in, redirect to home
+    if (isLoaded && isSignedIn) {
+      router.push('/home');
+    }
+  }, [isLoaded, isSignedIn, router]);
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">

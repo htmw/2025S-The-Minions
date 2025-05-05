@@ -10,13 +10,15 @@ export default function AuthSuccess() {
 
     useEffect(() => {
         if (isLoaded) {
-            if (isSignedIn) {
-                // User is authenticated, redirect to home
-                router.push('/home');
-            } else {
-                // User is not authenticated, redirect to login
-                router.push('/auth/login');
-            }
+            const timer = setTimeout(() => {
+                if (isSignedIn) {
+                    router.push('/home');
+                } else {
+                    router.push('/auth/login');
+                }
+            }, 500);
+            
+            return () => clearTimeout(timer);
         }
     }, [isSignedIn, isLoaded, router]);
 

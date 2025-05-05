@@ -1,35 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/services/api';
+import { useRouter } from 'next/navigation';
 import { Brain, Upload, History, Settings, LogOut } from 'lucide-react';
+import { useUser, useClerk } from '@clerk/nextjs';
 
 export default function HomePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await auth.getCurrentUser();
-        setUser(response.data);
-      } catch (error) {
-        router.push('/auth/login');
-      }
-    };
+    // If Clerk has loaded and the user is not signed in, redirect to login
+    if (isLoaded && !isSignedIn) {
+      router.push('/auth/login');
+      return;
+    }
 
-    checkAuth();
-  }, [router]);
+    // If user is loaded and signed in, set loading to false
+    if (isLoaded && isSignedIn) {
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn, router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await signOut();
     router.push('/auth/login');
   };
 
-  if (!user) {
-    return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
@@ -83,12 +89,12 @@ export default function HomePage() {
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
                 <span className="text-sm font-medium text-white">
-                  {user.name.charAt(0).toUpperCase()}
+                  {user?.firstName?.charAt(0) || user?.emailAddresses[0]?.emailAddress?.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-white">{user.name}</p>
-                <p className="text-xs text-gray-400">{user.email}</p>
+                <p className="text-sm font-medium text-white">{user?.firstName || 'User'}</p>
+                <p className="text-xs text-gray-400">{user?.emailAddresses[0]?.emailAddress}</p>
               </div>
             </div>
           </div>
@@ -99,7 +105,7 @@ export default function HomePage() {
       <main className="ml-64 p-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Welcome back, {user.name}</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {user?.firstName || 'User'}</h1>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"

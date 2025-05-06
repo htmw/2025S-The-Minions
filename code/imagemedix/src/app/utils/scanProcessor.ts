@@ -1,6 +1,7 @@
-import { FileWithId } from './idUtils';
-import { mlModel, scans } from '@/services/api';
+import { FileWithId } from './types';
 import { generateReport } from './reportUtils';
+import { simulateAnalysis, fileToDataUrl } from './imageUtils';
+import { saveScanToLocalStorage } from './localStorageService';
 
 export interface ProcessingCallbacks {
   onUploadStatusChange: (fileId: string, status: 'pending' | 'uploading' | 'analyzing' | 'success' | 'error') => void;
@@ -14,24 +15,29 @@ export const processChestXray = async (
   file: FileWithId,
   patientId: string,
   patientName: string,
+  userEmail: string,
   callbacks: ProcessingCallbacks
 ) => {
   try {
+    callbacks.onUploadStatusChange(file.id, 'uploading');
+    
+    // Convert file to data URL for storage
+    const imageUrl = await fileToDataUrl(file);
+    
     callbacks.onUploadStatusChange(file.id, 'analyzing');
     
-    const response = await mlModel.analyzeChestXray(file);
+    // Simulate API call with our local function
+    const analysisResult = await simulateAnalysis('chest');
     
-    const classifications = response.classifications || [];
-    const explanation = response.explanation || '';
-    
-    const normalClass = classifications.find((c: any) => c.label === 'normal');
-    const pneumoniaClass = classifications.find((c: any) => c.label === 'pneumonia');
-    
-    const normalScore = normalClass?.score || 0;
-    const pneumoniaScore = pneumoniaClass?.score || 0;
-    
-    const condition = pneumoniaScore > normalScore ? 'pneumonia' : 'normal';
-    const confidence = condition === 'pneumonia' ? pneumoniaScore : normalScore;
+    const condition = analysisResult.condition;
+    const confidence = analysisResult.confidence;
+    const normalScore = analysisResult.normalScore;
+    const pneumoniaScore = analysisResult.pneumoniaScore;
+
+    // Generate explanation (simplified)
+    const explanation = condition === 'pneumonia'
+      ? `Analysis of the chest X-ray reveals opacities consistent with pneumonia. The distribution pattern suggests bacterial infection. Lung peripheries show increased density, and there is evidence of consolidation.`
+      : `Analysis of the chest X-ray shows clear lung fields with no evidence of infiltrates, consolidation, or effusion. Heart size and pulmonary vascularity appear within normal limits.`;
 
     const reportDate = new Date().toISOString();
     const structuredReport = generateReport({
@@ -51,46 +57,30 @@ export const processChestXray = async (
       pneumoniaScore,
       explanation,
       report: structuredReport,
-      reportDate,
-      raw: response
+      reportDate
     };
     
     callbacks.onAnalysisResultsUpdate(file.id, result);
+    
+    // Save to localStorage instead of API
+    const savedScan = saveScanToLocalStorage({
+      patientId,
+      patientName,
+      scanType: 'chest',
+      result,
+      imageUrl,
+      userEmail
+    });
+    
+    callbacks.onScanIdUpdate(savedScan._id);
     callbacks.onUploadStatusChange(file.id, 'success');
-    
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('patientId', patientId);
-    formData.append('patientName', patientName);
-    formData.append('scanType', 'chest');
-    
-    formData.append('result', JSON.stringify({
-      hasTumor: condition === 'pneumonia',
-      confidence: confidence,
-      tumorType: condition === 'pneumonia' ? 'Pneumonia' : 'Normal',
-      tumorLocation: condition === 'pneumonia' ? 'Lungs' : 'N/A',
-      tumorSize: 'N/A',
-      additionalNotes: explanation.slice(0, 1000),
-      report: structuredReport
-    }));
-    
-    try {
-      const uploadResponse = await scans.upload(formData);
-      
-      if (uploadResponse.data._id) {
-        callbacks.onScanIdUpdate(uploadResponse.data._id);
-      }
-      
-      callbacks.onProcessingComplete();
-    } catch (uploadError) {
-      console.error('Failed to upload scan to backend:', uploadError);
-    }
+    callbacks.onProcessingComplete();
     
     return result;
   } catch (error: any) {
     console.error('Error analyzing chest X-ray:', error);
     callbacks.onUploadStatusChange(file.id, 'error');
-    callbacks.onError(error.response?.data?.message || `Failed to analyze ${file.name}`);
+    callbacks.onError(`Failed to analyze ${file.name}: ${error.message}`);
     throw error;
   }
 };
@@ -99,74 +89,64 @@ export const processBrainScan = async (
   file: FileWithId,
   patientId: string,
   patientName: string,
+  userEmail: string,
   callbacks: ProcessingCallbacks
 ) => {
   try {
     callbacks.onUploadStatusChange(file.id, 'uploading');
     
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('patientId', patientId);
-    formData.append('patientName', patientName);
-    formData.append('scanType', 'brain');
+    // Convert file to data URL for storage
+    const imageUrl = await fileToDataUrl(file);
     
-    const response = await scans.upload(formData);
     callbacks.onUploadStatusChange(file.id, 'analyzing');
     
-    if (response.data._id) {
-      callbacks.onScanIdUpdate(response.data._id);
-      pollAnalysisStatus(response.data._id, file.id, callbacks);
-    }
-  } catch (err: any) {
-    callbacks.onUploadStatusChange(file.id, 'error');
-    callbacks.onError(err.response?.data?.message || `Failed to upload ${file.name}`);
-  }
-};
-
-export const pollAnalysisStatus = async (
-  scanId: string, 
-  fileId: string, 
-  callbacks: ProcessingCallbacks
-) => {
-  try {
-    const { data: statusData } = await mlModel.getAnalysisStatus(scanId);
+    // Simulate API call with our local function
+    const analysisResult = await simulateAnalysis('brain');
     
-    if (statusData.status === 'completed') {
-      const { data: results } = await scans.getById(scanId);
+    // Add explanation
+    const explanation = analysisResult.hasTumor
+      ? `Analysis of the brain MRI reveals a mass with characteristics consistent with a ${analysisResult.tumorType}. The lesion is located in the ${analysisResult.tumorLocation} and demonstrates heterogeneous signal intensity.`
+      : `Analysis of the brain MRI shows no evidence of intracranial mass. The brain parenchyma demonstrates normal signal intensity throughout. Ventricles and sulci are of normal size and configuration.`;
 
-      const reportDate = new Date().toISOString();
-      let structuredReport = results.report;
-      
-      if (!structuredReport) {
-        structuredReport = generateReport({
-          patientName: results.patientName || 'Unknown',
-          patientId: results.patientId || 'Unknown',
-          scanType: 'brain',
-          condition: results.hasTumor ? 'tumor' : 'normal',
-          confidence: results.confidence || 0.5,
-          explanation: results.additionalNotes || '',
-          reportDate
-        });
-      }
-
-      const enhancedResults = {
-        ...results,
-        report: structuredReport,
-        reportDate
-      };
-      
-      callbacks.onAnalysisResultsUpdate(fileId, enhancedResults);
-      callbacks.onUploadStatusChange(fileId, 'success');
-      callbacks.onProcessingComplete();
-    } else if (statusData.status === 'failed' || (statusData.jobStatus?.state === 'failed')) {
-      callbacks.onUploadStatusChange(fileId, 'error');
-      callbacks.onError(`Analysis failed for ${fileId}: ${statusData.jobStatus?.failedReason || 'Unknown error'}`);
-    } else {
-      callbacks.onUploadStatusChange(fileId, 'analyzing');
-      setTimeout(() => pollAnalysisStatus(scanId, fileId, callbacks), 5000);
-    }
+    const reportDate = new Date().toISOString();
+    const structuredReport = generateReport({
+      patientName,
+      patientId,
+      scanType: 'brain',
+      condition: analysisResult.hasTumor ? 'tumor' : 'normal',
+      confidence: analysisResult.confidence,
+      explanation,
+      reportDate
+    });
+    
+    const result = {
+      ...analysisResult,
+      explanation,
+      report: structuredReport,
+      reportDate
+    };
+    
+    callbacks.onAnalysisResultsUpdate(file.id, result);
+    
+    // Save to localStorage instead of API
+    const savedScan = saveScanToLocalStorage({
+      patientId,
+      patientName,
+      scanType: 'brain',
+      result,
+      imageUrl,
+      userEmail
+    });
+    
+    callbacks.onScanIdUpdate(savedScan._id);
+    callbacks.onUploadStatusChange(file.id, 'success');
+    callbacks.onProcessingComplete();
+    
+    return result;
   } catch (error: any) {
-    callbacks.onUploadStatusChange(fileId, 'error');
-    callbacks.onError(error.response?.data?.message || `Failed to get analysis status for ${fileId}`);
+    console.error('Error analyzing brain scan:', error);
+    callbacks.onUploadStatusChange(file.id, 'error');
+    callbacks.onError(`Failed to analyze ${file.name}: ${error.message}`);
+    throw error;
   }
 };

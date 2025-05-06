@@ -1,20 +1,26 @@
 import { ScanData, ScanResult } from './types';
-import { v4 as uuidv4 } from 'uuid';
 
-const generateId = () => uuidv4();
+const generateId = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+interface ScanDataInput {
+  patientId: string;
+  patientName: string;
+  scanType: 'brain' | 'chest';
+  result?: ScanResult;
+  imageUrl?: string;
+  userEmail: string;
+}
 
 export const saveScanToLocalStorage = (
-  scanData: {
-    patientId: string;
-    patientName: string;
-    scanType: 'brain' | 'chest';
-    result?: ScanResult;
-    imageUrl?: string;
-    userEmail: string;
-  }
-) => {
+  scanData: ScanDataInput
+): ScanData => {
   try {
-    // Get existing scans from localStorage
     const storedScans = localStorage.getItem('userScans');
     let scans: ScanData[] = [];
     
@@ -27,7 +33,6 @@ export const saveScanToLocalStorage = (
       }
     }
     
-    // Create new scan object
     const newScan: ScanData = {
       _id: generateId(),
       patientId: scanData.patientId,
@@ -38,13 +43,11 @@ export const saveScanToLocalStorage = (
       createdAt: new Date().toISOString(),
       result: scanData.result,
       userEmail: scanData.userEmail,
-      imageUrl: scanData.imageUrl || null
+      imageUrl: scanData.imageUrl || undefined
     };
     
-    // Add new scan to array
     scans.push(newScan);
     
-    // Save updated array back to localStorage
     localStorage.setItem('userScans', JSON.stringify(scans));
     
     return newScan;
@@ -54,7 +57,7 @@ export const saveScanToLocalStorage = (
   }
 };
 
-export const getScansFromLocalStorage = (userEmail: string) => {
+export const getScansFromLocalStorage = (userEmail: string): ScanData[] => {
   try {
     const storedScans = localStorage.getItem('userScans');
     let allScans: ScanData[] = [];
@@ -68,7 +71,6 @@ export const getScansFromLocalStorage = (userEmail: string) => {
       }
     }
     
-    // Filter scans for the current user
     const userScans = allScans.filter(scan => scan.userEmail === userEmail);
     return userScans;
   } catch (error) {
@@ -77,7 +79,7 @@ export const getScansFromLocalStorage = (userEmail: string) => {
   }
 };
 
-export const getScanByIdFromLocalStorage = (scanId: string) => {
+export const getScanByIdFromLocalStorage = (scanId: string): ScanData | null => {
   try {
     const storedScans = localStorage.getItem('userScans');
     let allScans: ScanData[] = [];
@@ -91,7 +93,6 @@ export const getScanByIdFromLocalStorage = (scanId: string) => {
       }
     }
     
-    // Find scan with matching ID
     const scan = allScans.find(scan => scan._id === scanId);
     return scan || null;
   } catch (error) {
@@ -100,7 +101,7 @@ export const getScanByIdFromLocalStorage = (scanId: string) => {
   }
 };
 
-export const deleteScanFromLocalStorage = (scanId: string) => {
+export const deleteScanFromLocalStorage = (scanId: string): boolean => {
   try {
     const storedScans = localStorage.getItem('userScans');
     let allScans: ScanData[] = [];

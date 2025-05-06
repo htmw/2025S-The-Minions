@@ -108,8 +108,8 @@ const ResultModal: React.FC<ResultModalProps> = ({
                         : 'text-green-400'
                     }`}>
                       {scanType === 'chest' 
-                        ? selectedResult.condition === 'pneumonia' ? 'Pneumonia' : 'Normal' 
-                        : selectedResult.hasTumor ? 'Brain Tumor' : 'Normal'}
+                        ? selectedResult.condition === 'pneumonia' ? 'Pneumonia' : 'Normal Lungs' 
+                        : selectedResult.hasTumor ? 'Brain Tumor' : 'Normal Brain'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">

@@ -1,24 +1,20 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, Fragment } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { 
   Upload,
-  Brain,
   X,
   AlertCircle,
   FileImage,
   CheckCircle,
   Loader2,
   Heart,
-  ChevronDown,
-  ChevronUp,
+  Brain,
   Eye,
   Badge,
   BarChart3,
   FileText,
-  Calendar,
   User,
-  Clock,
   Download,
   XCircle
 } from "lucide-react";
@@ -26,6 +22,8 @@ import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import { scans, mlModel } from "@/services/api";
 import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
+import Sidebar from '@/components/Sidebar';
 
 // Create a unique ID generator for files
 const generateUniqueId = (() => {
@@ -40,6 +38,7 @@ interface FileWithId extends File {
 
 export default function UploadPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useUser();
   const [files, setFiles] = useState<FileWithId[]>([]);
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'pending' | 'uploading' | 'analyzing' | 'success' | 'error' }>({});
   const [error, setError] = useState('');
@@ -47,13 +46,24 @@ export default function UploadPage() {
   const [patientName, setPatientName] = useState('');
   const [analysisResults, setAnalysisResults] = useState<{ [key: string]: any }>({});
   const [scanType, setScanType] = useState<'brain' | 'chest'>('brain');
-  const [expandedExplanations, setExpandedExplanations] = useState<{ [key: string]: boolean }>({});
   const [processingComplete, setProcessingComplete] = useState(false);
   const [uploadedScanIds, setUploadedScanIds] = useState<string[]>([]); 
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<FileWithId | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check auth status first
+    if (isLoaded) {
+      if (!isSignedIn) {
+        router.push('/auth/login');
+        return;
+      }
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
     // Show success message when processing is complete
@@ -106,13 +116,6 @@ export default function UploadPage() {
     },
     maxSize: 10 * 1024 * 1024 // 10MB
   });
-
-  const toggleExplanation = (fileId: string) => {
-    setExpandedExplanations(prev => ({
-      ...prev,
-      [fileId]: !prev[fileId]
-    }));
-  };
 
   const processChestXray = async (file: FileWithId) => {
     try {
@@ -185,7 +188,6 @@ export default function UploadPage() {
       
       try {
         const uploadResponse = await scans.upload(formData);
-        console.log('Scan uploaded to backend:', uploadResponse.data);
         
         // Store the scan ID
         if (uploadResponse.data._id) {
@@ -252,12 +254,12 @@ export default function UploadPage() {
         setUploadStatus(prev => ({ ...prev, [fileId]: 'error' }));
         setError(`Analysis failed for ${fileId}: ${statusData.jobStatus?.failedReason || 'Unknown error'}`);
       } else if (statusData.status === 'processing' || statusData.jobStatus?.state === 'active') {
-        setUploadStatus(prev => ({ ...prev, [file.id]: 'analyzing' }));
+        setUploadStatus(prev => ({ ...prev, [fileId]: 'analyzing' }));
         // Still processing, check again in 5 seconds
         setTimeout(() => checkAnalysisStatus(scanId, fileId), 5000);
       } else {
         // Waiting in queue
-        setUploadStatus(prev => ({ ...prev, [file.id]: 'analyzing' }));
+        setUploadStatus(prev => ({ ...prev, [fileId]: 'analyzing' }));
         setTimeout(() => checkAnalysisStatus(scanId, fileId), 5000);
       }
     } catch (error: any) {
@@ -480,12 +482,6 @@ This report should be reviewed by a licensed healthcare professional.
       delete newResults[fileId];
       return newResults;
     });
-    // Clean up expanded state
-    setExpandedExplanations(prev => {
-      const newState = { ...prev };
-      delete newState[fileId];
-      return newState;
-    });
   };
 
   // Check if all files are processed
@@ -498,43 +494,24 @@ This report should be reviewed by a licensed healthcare professional.
     return (result.confidence * 100).toFixed(1) + '%';
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <nav className="flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded bg-indigo-600 flex items-center justify-center text-white">
-                <Brain size={20} />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-indigo-500">Image</span>Medix
-              </span>
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-8 text-gray-400">
-              <Link href="/home" className="text-sm hover:text-white transition-colors">Home</Link>
-              <Link href="/upload" className="text-sm hover:text-white transition-colors text-white">Upload</Link>
-              <Link href="/results" className="text-sm hover:text-white transition-colors">Results</Link>
-              <Link href="/about" className="text-sm hover:text-white transition-colors">About</Link>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="rounded-full bg-gray-800 text-white px-4 py-2 text-sm font-medium hover:bg-gray-700 transition-all"
-              >
-                Profile
-              </Link>
-            </div>
-          </nav>
-        </div>
-      </header>
+      {/* Sidebar */}
+      <Sidebar />
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="ml-64 p-8">
         <div className="space-y-6">
+          <h1 className="text-3xl font-bold">Upload Medical Scans</h1>
+          
           {/* Success Message */}
           {showSuccessMessage && (
             <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 flex items-start">

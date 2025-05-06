@@ -18,7 +18,7 @@ import { processChestXray, processBrainScan } from '../utils/scanProcessor';
 
 export default function UploadPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   
   const [files, setFiles] = useState<FileWithId[]>([]);
   const [uploadStatus, setUploadStatus] = useState<{ [key: string]: 'pending' | 'uploading' | 'analyzing' | 'success' | 'error' }>({});
@@ -93,6 +93,17 @@ export default function UploadPage() {
       return;
     }
 
+    if (!user) {
+      setError('User not authenticated');
+      return;
+    }
+
+    const userEmail = user.emailAddresses[0]?.emailAddress;
+    if (!userEmail) {
+      setError('Unable to identify user email');
+      return;
+    }
+
     setError('');
     setProcessingComplete(false);
     setShowSuccessMessage(false);
@@ -100,7 +111,7 @@ export default function UploadPage() {
     let filesToProcess = files.filter(file => uploadStatus[file.id] === 'pending').length;
     
     if (filesToProcess === 0) {
-      router.push('/results');
+      router.push('/history');
       return;
     }
     
@@ -108,7 +119,7 @@ export default function UploadPage() {
       if (uploadStatus[file.id] === 'pending') {
         try {
           if (scanType === 'chest') {
-            await processChestXray(file, patientId, patientName, {
+            await processChestXray(file, patientId, patientName, userEmail, {
               onUploadStatusChange: (fileId, status) => {
                 setUploadStatus(prev => ({ ...prev, [fileId]: status }));
               },
@@ -126,7 +137,7 @@ export default function UploadPage() {
               }
             });
           } else {
-            await processBrainScan(file, patientId, patientName, {
+            await processBrainScan(file, patientId, patientName, userEmail, {
               onUploadStatusChange: (fileId, status) => {
                 setUploadStatus(prev => ({ ...prev, [fileId]: status }));
               },
@@ -187,7 +198,7 @@ export default function UploadPage() {
 
   // Navigate to results page
   const viewResults = () => {
-    router.push('/results');
+    router.push('/history');
   };
 
   // Remove a file from the list

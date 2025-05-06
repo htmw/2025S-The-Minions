@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
-import { Brain, Upload, History, Settings } from 'lucide-react';
+import { Upload, History, Settings } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 
 export default function HomePage() {

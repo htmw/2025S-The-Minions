@@ -3,86 +3,124 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { scans } from '@/services/api';
 import { FileText, Trash2, Upload } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import { useUser } from '@clerk/nextjs';
 
+// Interface for scan data
+interface Scan {
+  _id: string;
+  patientId: string;
+  patientName: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  result?: {
+    diagnosis: string;
+    confidence: number;
+    condition?: string;
+    hasTumor?: boolean;
+  };
+  scanType?: 'brain' | 'chest';
+  userEmail?: string;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
-  const [scansList, setScansList] = useState([]);
+  const { user, isLoaded, isSignedIn } = useUser();
+  const [scansList, setScansList] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     // Check auth status first
     if (isLoaded) {
-      if (!isSignedIn) {
+      if (!isSignedIn || !user) {
         router.push('/auth/login');
         return;
       }
-      // Then fetch scans
-      fetchScans();
+      // Then fetch scans from localStorage
+      fetchScansFromLocalStorage();
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router, user]);
 
-  const fetchScans = async () => {
+  const fetchScansFromLocalStorage = () => {
     try {
-      const response = await scans.getAll();
+      // Get user's email from Clerk
+      const userEmail = user?.emailAddresses[0]?.emailAddress;
       
-      // Debug: Log the API response to see its structure
-      console.log('API response:', response);
-
-      // Make sure we're setting an array to scansList
-      if (response && response.data) {
-        // Handle different API response formats
-        if (Array.isArray(response.data)) {
-          setScansList(response.data);
-        } else if (response.data.scans && Array.isArray(response.data.scans)) {
-          setScansList(response.data.scans);
-        } else if (response.data.items && Array.isArray(response.data.items)) {
-          setScansList(response.data.items);
-        } else if (response.data.results && Array.isArray(response.data.results)) {
-          setScansList(response.data.results);
-        } else {
-          // If we can't find an array in the response, set an empty array
-          console.error('Unexpected API response format:', response.data);
-          setScansList([]);
-        }
-      } else {
-        setScansList([]);
+      if (!userEmail) {
+        setError('Unable to identify user email');
+        setLoading(false);
+        return;
       }
+
+      // Retrieve scans from localStorage
+      const storedScans = localStorage.getItem('userScans');
+      let allScans: Scan[] = [];
+      
+      if (storedScans) {
+        try {
+          allScans = JSON.parse(storedScans);
+        } catch (e) {
+          console.error('Error parsing stored scans:', e);
+          allScans = [];
+        }
+      }
+      
+      // Filter scans for the current user
+      const userScans = allScans.filter(scan => scan.userEmail === userEmail);
+      setScansList(userScans);
+      
     } catch (err) {
-      console.error('Error fetching scans:', err);
-      setError(err.response?.data?.message || 'Failed to fetch scans');
-      setScansList([]); // Ensure scansList is an array even on error
+      console.error('Error fetching scans from localStorage:', err);
+      setError('Failed to fetch your scan history');
+      setScansList([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (scanId) => {
+  const handleDelete = (scanId: string) => {
     if (!confirm('Are you sure you want to delete this scan?')) {
       return;
     }
 
     try {
-      await scans.delete(scanId);
-      setScansList(prev => prev.filter(scan => scan._id !== scanId));
+      // Get all scans from localStorage
+      const storedScans = localStorage.getItem('userScans');
+      
+      if (storedScans) {
+        let allScans: Scan[] = JSON.parse(storedScans);
+        
+        // Remove the scan with the given ID
+        allScans = allScans.filter(scan => scan._id !== scanId);
+        
+        // Save the updated list back to localStorage
+        localStorage.setItem('userScans', JSON.stringify(allScans));
+        
+        // Update the UI
+        const userEmail = user?.emailAddresses[0]?.emailAddress;
+        setScansList(allScans.filter(scan => scan.userEmail === userEmail));
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete scan');
+      console.error('Error deleting scan:', err);
+      setError('Failed to delete scan');
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return 'Invalid date';
+    }
   };
 
   return (
@@ -131,7 +169,7 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="grid gap-6">
-              {Array.isArray(scansList) && scansList.map((scan) => (
+              {scansList.map((scan) => (
                 <div
                   key={scan._id}
                   className="bg-gray-900 rounded-lg border border-gray-800 p-6"
@@ -146,7 +184,7 @@ export default function HistoryPage() {
                       </p>
                       <div className="flex items-center gap-4">
                         <span className="text-sm text-gray-400">
-                          Type: {scan.type}
+                          Type: {scan.scanType || scan.type}
                         </span>
                         <span className="text-sm text-gray-400">
                           Status: {scan.status}
@@ -155,7 +193,8 @@ export default function HistoryPage() {
                       {scan.result && (
                         <div className="mt-4">
                           <p className="text-sm text-gray-400">
-                            Diagnosis: {scan.result.diagnosis}
+                            Diagnosis: {scan.result.diagnosis || (scan.result.hasTumor ? 'Brain Tumor' : 'Normal Brain') || 
+                                        (scan.result.condition === 'pneumonia' ? 'Pneumonia' : 'Normal Lungs')}
                           </p>
                           <p className="text-sm text-gray-400">
                             Confidence: {(scan.result.confidence * 100).toFixed(1)}%

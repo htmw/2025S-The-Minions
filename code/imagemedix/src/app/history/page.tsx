@@ -160,12 +160,26 @@ export default function HistoryPage() {
   };
 
   // Helper function to get diagnosis text
-  const getDiagnosis = (result?: ScanResult) => {
+  const getDiagnosis = (result?: ScanResult, scan?: Scan) => {
     if (!result) return "Unknown";
     
-    return result.diagnosis || 
-           (result.hasTumor ? 'Brain Tumor' : 'Normal Brain') || 
-           (result.condition === 'pneumonia' ? 'Pneumonia' : 'Normal Lungs');
+    // First check for explicit diagnosis
+    if (result.diagnosis) return result.diagnosis;
+    
+    // Then check scan type and return appropriate diagnosis
+    const scanType = scan?.scanType || 'brain';
+    
+    if (scanType === 'brain') {
+      return result.hasTumor ? 'Brain Tumor' : 'Normal Brain';
+    } else if (scanType === 'chest') {
+      return result.condition === 'pneumonia' ? 'Pneumonia' : 'Normal Lungs';
+    }
+    
+    // Fallback logic
+    if (result.hasTumor) return 'Brain Tumor';
+    if (result.condition === 'pneumonia') return 'Pneumonia';
+    
+    return "Unknown";
   };
 
   // Helper function to determine if result is abnormal
@@ -244,7 +258,7 @@ export default function HistoryPage() {
                       {scan.result && (
                         <div className="mt-4">
                           <p className="text-sm text-gray-400">
-                            Diagnosis: {getDiagnosis(scan.result)}
+                            Diagnosis: {getDiagnosis(scan.result, scan)}
                           </p>
                           <p className="text-sm text-gray-400">
                             Confidence: {(scan.result.confidence ? (scan.result.confidence * 100).toFixed(1) : 0)}%
@@ -310,6 +324,10 @@ export default function HistoryPage() {
                         <span className="text-white">{selectedScan.patientName}</span>
                       </div>
                       <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Patient Name:</span>
+                        <span className="text-white">{selectedScan.patientName}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
                         <span className="text-gray-400">Scan Date:</span>
                         <span className="text-white">{formatDate(selectedScan.createdAt)}</span>
                       </div>
@@ -340,7 +358,7 @@ export default function HistoryPage() {
                               ? 'text-red-400' 
                               : 'text-green-400'
                           }`}>
-                            {getDiagnosis(selectedScan.result)}
+                            {getDiagnosis(selectedScan.result, selectedScan)}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">

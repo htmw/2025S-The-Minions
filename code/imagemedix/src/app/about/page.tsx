@@ -1,37 +1,42 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
-import { Brain, HeartPulse, Database, Search, Activity, LineChart, Award, Shield, Microscope, Clock, CheckCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
+import { HeartPulse, CheckCircle, Brain, Clock, Activity, Microscope } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
 export default function AboutPage() {
+  const router = useRouter();
+  const { isLoaded, isSignedIn } = useUser();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check auth status first
+    if (isLoaded) {
+      if (!isSignedIn) {
+        router.push('/auth/login');
+        return;
+      }
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="border-b border-gray-900 bg-gray-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <nav className="flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded bg-indigo-600 flex items-center justify-center text-white">
-                <Brain size={20} />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-indigo-500">Image</span>Medix
-              </span>
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-8 text-gray-400">
-              <Link href="/home" className="text-sm hover:text-white transition-colors">Home</Link>
-              <Link href="/upload" className="text-sm hover:text-white transition-colors">Upload</Link>
-              <Link href="/history" className="text-sm hover:text-white transition-colors">History</Link>
-              <Link href="/about" className="text-sm hover:text-white transition-colors text-white">About</Link>
-            </div>
-          </nav>
-        </div>
-      </header>
+      {/* Sidebar */}
+      <Sidebar />
 
       {/* Main Content */}
-      <main className="py-16">
+      <main className="ml-64 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           {/* Problem Statement Section */}
           <div className="mb-16 text-center">
@@ -135,15 +140,6 @@ export default function AboutPage() {
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="py-8 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <p className="text-gray-500">
-            © {new Date().getFullYear()} ImageMedix | AI-Powered Medical Image Analysis
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

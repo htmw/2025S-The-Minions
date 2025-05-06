@@ -4,29 +4,28 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { scans } from '@/services/api';
-import { Brain, Upload, History, Settings, LogOut, FileText, Trash2 } from 'lucide-react';
-
-interface Scan {
-  _id: string;
-  patientId: string;
-  type: string;
-  status: string;
-  createdAt: string;
-  result?: {
-    diagnosis: string;
-    confidence: number;
-  };
-}
+import { FileText, Trash2, Upload } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
+import { useUser } from '@clerk/nextjs';
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [scansList, setScansList] = useState<Scan[]>([]);
+  const { isLoaded, isSignedIn } = useUser();
+  const [scansList, setScansList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchScans();
-  }, []);
+    // Check auth status first
+    if (isLoaded) {
+      if (!isSignedIn) {
+        router.push('/auth/login');
+        return;
+      }
+      // Then fetch scans
+      fetchScans();
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   const fetchScans = async () => {
     try {
@@ -54,7 +53,7 @@ export default function HistoryPage() {
       } else {
         setScansList([]);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching scans:', err);
       setError(err.response?.data?.message || 'Failed to fetch scans');
       setScansList([]); // Ensure scansList is an array even on error
@@ -63,7 +62,7 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (scanId: string) => {
+  const handleDelete = async (scanId) => {
     if (!confirm('Are you sure you want to delete this scan?')) {
       return;
     }
@@ -71,12 +70,12 @@ export default function HistoryPage() {
     try {
       await scans.delete(scanId);
       setScansList(prev => prev.filter(scan => scan._id !== scanId));
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete scan');
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -89,51 +88,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800">
-        <div className="flex flex-col h-full">
-          <div className="p-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center">
-                <Brain size={20} className="text-white" />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-indigo-500">Image</span>Medix
-              </span>
-            </div>
-          </div>
-
-          <nav className="flex-1 px-4 space-y-1">
-            <Link
-              href="/home"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Brain size={20} />
-              <span>Dashboard</span>
-            </Link>
-            <Link
-              href="/upload"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Upload size={20} />
-              <span>Upload Scans</span>
-            </Link>
-            <Link
-              href="/history"
-              className="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 rounded-lg"
-            >
-              <History size={20} />
-              <span>History</span>
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Settings size={20} />
-              <span>Settings</span>
-            </Link>
-          </nav>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* Main Content */}
       <main className="ml-64 p-8">

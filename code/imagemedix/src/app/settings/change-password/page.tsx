@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/services/api';
+import { useUser } from '@clerk/nextjs';
 import { Brain, Upload, History, Settings, LogOut, Lock, ArrowLeft } from 'lucide-react';
+
+import Sidebar from '@/components/Sidebar';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useUser();
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -15,30 +18,53 @@ export default function ChangePasswordPage() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isLoaded) {
+      if (!isSignedIn) {
+        router.push('/auth/login');
+        return;
+      }
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    setLoading(true);
 
     if (formData.newPassword !== formData.confirmPassword) {
       setError('New passwords do not match');
-      setLoading(false);
+      return;
+    }
+
+    if (formData.newPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
       return;
     }
 
     try {
-      // TODO: Implement change password API endpoint
-      setSuccess('Password updated successfully');
+      // Since we're using Clerk for auth, we'll need to implement their password change
+      // For now, we'll just show a success message
+      
+      // Simulated success
+      setSuccess('Password updated successfully. Since this is a demo, no actual password was changed.');
+      
+      // Clear form
+      setFormData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      
+      // Redirect back to settings after a delay
       setTimeout(() => {
         router.push('/settings');
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update password');
-    } finally {
-      setLoading(false);
+      setError('Failed to update password');
     }
   };
 
@@ -47,64 +73,18 @@ export default function ChangePasswordPage() {
     router.push('/auth/login');
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800">
-        <div className="flex flex-col h-full">
-          <div className="p-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center">
-                <Brain size={20} className="text-white" />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-indigo-500">Image</span>Medix
-              </span>
-            </div>
-          </div>
-
-          <nav className="flex-1 px-4 space-y-1">
-            <Link
-              href="/home"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Brain size={20} />
-              <span>Dashboard</span>
-            </Link>
-            <Link
-              href="/upload"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Upload size={20} />
-              <span>Upload Scans</span>
-            </Link>
-            <Link
-              href="/history"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <History size={20} />
-              <span>History</span>
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 rounded-lg"
-            >
-              <Settings size={20} />
-              <span>Settings</span>
-            </Link>
-          </nav>
-
-          <div className="p-4 border-t border-gray-800">
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors w-full"
-            >
-              <LogOut size={20} />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* Main Content */}
       <main className="ml-64 p-8">
@@ -161,6 +141,7 @@ export default function ChangePasswordPage() {
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
                   />
+                  <p className="mt-1 text-xs text-gray-500">Password must be at least 8 characters long</p>
                 </div>
 
                 <div>
@@ -181,14 +162,13 @@ export default function ChangePasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-500 transition-colors"
             >
-              {loading ? 'Updating...' : 'Update Password'}
+              Update Password
             </button>
           </form>
         </div>
       </main>
     </div>
   );
-} 
+}

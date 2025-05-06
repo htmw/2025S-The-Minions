@@ -32,7 +32,15 @@ const FileItem: React.FC<FileItemProps> = ({
   onViewReport
 }) => {
   const isChestXray = scanType === 'chest';
-  const condition = isChestXray && result ? result.condition : result?.hasTumor ? 'tumor' : 'normal';
+  // Properly determine condition based on scan type
+  let condition = 'normal';
+  if (result) {
+    if (isChestXray) {
+      condition = result.condition || 'normal';
+    } else {
+      condition = result.hasTumor ? 'tumor' : 'normal';
+    }
+  }
   const isAbnormal = isChestXray ? condition === 'pneumonia' : condition === 'tumor';
   
   const getConfidencePercentage = (result: any) => {
@@ -112,10 +120,10 @@ const FileItem: React.FC<FileItemProps> = ({
                 {isChestXray
                   ? condition === 'pneumonia'
                     ? 'Pneumonia Detected'
-                    : 'Normal'
+                    : 'Normal Lungs'
                   : condition === 'tumor'
                     ? 'Tumor Detected'
-                    : 'Normal'}
+                    : 'Normal Brain'}
               </p>
             </div>
             {result.confidence && (

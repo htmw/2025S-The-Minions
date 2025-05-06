@@ -3,19 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { auth } from '@/services/api';
+import { useUser } from '@clerk/nextjs';
 import { Brain, Upload, History, Settings, LogOut, User, Lock, Bell } from 'lucide-react';
 
-interface UserSettings {
-  name: string;
-  email: string;
-  notifications: boolean;
-  darkMode: boolean;
-}
+import Sidebar from '@/components/Sidebar';
+import { UserSettings, getUserSettings, saveUserSettings } from '../utils/settingsService';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, isLoaded, isSignedIn } = useUser();
   const [settings, setSettings] = useState<UserSettings>({
     name: '',
     email: '',
@@ -27,20 +23,36 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    fetchUser();
-  }, []);
+    if (isLoaded) {
+      if (!isSignedIn || !user) {
+        router.push('/auth/login');
+        return;
+      }
+      
+      fetchUserSettings();
+    }
+  }, [isLoaded, isSignedIn, router, user]);
 
-  const fetchUser = async () => {
+  const fetchUserSettings = () => {
     try {
-      const response = await auth.getCurrentUser();
-      setUser(response.data);
-      setSettings(prev => ({
-        ...prev,
-        name: response.data.name,
-        email: response.data.email,
-      }));
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch user data');
+      const userEmail = user?.emailAddresses[0]?.emailAddress;
+      
+      if (!userEmail) {
+        setError('Unable to identify user email');
+        setLoading(false);
+        return;
+      }
+
+      const userSettings = getUserSettings(userEmail);
+      
+      if (!userSettings.name && user?.fullName) {
+        userSettings.name = user.fullName;
+      }
+      
+      setSettings(userSettings);
+    } catch (err) {
+      console.error('Error fetching user settings:', err);
+      setError('Failed to load your settings');
     } finally {
       setLoading(false);
     }
@@ -52,15 +64,35 @@ export default function SettingsPage() {
     setSuccess('');
 
     try {
-      // TODO: Implement settings update API endpoint
-      setSuccess('Settings updated successfully');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update settings');
+      const userEmail = user?.emailAddresses[0]?.emailAddress;
+      
+      if (!userEmail) {
+        setError('Unable to identify user email');
+        return;
+      }
+      
+      const saved = saveUserSettings(userEmail, settings);
+      
+      if (saved) {
+        setSuccess('Settings updated successfully');
+        
+        if (settings.darkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        setError('Failed to save settings');
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      setError('Failed to update settings');
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    
     router.push('/auth/login');
   };
 
@@ -74,68 +106,8 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800">
-        <div className="flex flex-col h-full">
-          <div className="p-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded bg-indigo-600 flex items-center justify-center">
-                <Brain size={20} className="text-white" />
-              </div>
-              <span className="text-xl font-bold">
-                <span className="text-indigo-500">Image</span>Medix
-              </span>
-            </div>
-          </div>
+      <Sidebar />
 
-          <nav className="flex-1 px-4 space-y-1">
-            <Link
-              href="/home"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Brain size={20} />
-              <span>Dashboard</span>
-            </Link>
-            <Link
-              href="/upload"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Upload size={20} />
-              <span>Upload Scans</span>
-            </Link>
-            <Link
-              href="/history"
-              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <History size={20} />
-              <span>History</span>
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 rounded-lg"
-            >
-              <Settings size={20} />
-              <span>Settings</span>
-            </Link>
-          </nav>
-
-          <div className="p-4 border-t border-gray-800">
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-                <span className="text-sm font-medium text-white">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-white">{user?.name}</p>
-                <p className="text-xs text-gray-400">{user?.email}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
       <main className="ml-64 p-8">
         <div className="max-w-2xl mx-auto">
           <div className="flex justify-between items-center mb-8">
@@ -162,7 +134,6 @@ export default function SettingsPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Profile Section */}
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <User size={20} />
@@ -193,12 +164,13 @@ export default function SettingsPage() {
                     value={settings.email}
                     onChange={(e) => setSettings(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={true}
                   />
+                  <p className="mt-1 text-xs text-gray-500">Email cannot be changed as it's linked to your account</p>
                 </div>
               </div>
             </div>
 
-            {/* Preferences Section */}
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <Bell size={20} />
@@ -256,7 +228,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Security Section */}
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <Lock size={20} />
@@ -290,4 +261,4 @@ export default function SettingsPage() {
       </main>
     </div>
   );
-} 
+}
